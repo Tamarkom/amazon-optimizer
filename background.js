@@ -10,18 +10,22 @@ importScripts('scoring.js', 'ai.js');
 
 // ─── State ─────────────────────────────────────────────────
 
-let lastResults = null; // Cache last results for popup
+let lastResults = null;    // Cache last results for popup
+let isOptimizing = false;  // Track active optimization
 
 // ─── Message Handler ───────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.action === 'optimize') {
+        isOptimizing = true;
         handleOptimize(msg.product, sender.tab?.id)
             .then(results => {
                 lastResults = results;
+                isOptimizing = false;
                 sendResponse({ success: true });
             })
             .catch(err => {
+                isOptimizing = false;
                 console.error('[BG] Optimize failed:', err);
                 sendResponse({ error: err.message });
             });
@@ -29,12 +33,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg.action === 'getResults') {
-        sendResponse({ results: lastResults });
+        sendResponse({ results: lastResults, isOptimizing: isOptimizing });
         return false;
     }
 
     if (msg.action === 'clearResults') {
         lastResults = null;
+        isOptimizing = false;
         sendResponse({ success: true });
         return false;
     }

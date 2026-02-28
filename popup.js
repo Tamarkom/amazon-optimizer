@@ -58,7 +58,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
 
-        if (response?.results) {
+        if (response?.isOptimizing) {
+            showState('loading');
+        } else if (response?.results) {
             renderResults(response.results);
         } else {
             showState('empty');

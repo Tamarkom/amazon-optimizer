@@ -1,7 +1,4 @@
-{
-  "manifest_version": 3,
-  "name": "Amazon Shopping Optimizer",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Find the best deal on Amazon — AI-powered product comparison with smart scoring.",
   "permissions": [
     "activeTab",
