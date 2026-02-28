@@ -248,6 +248,8 @@
 
     // ─── Listen for messages from background/popup ───────────
 
+    // ─── Listen for messages from background/popup ───────────
+
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg.action === 'getProductData') {
             sendResponse(extractProductData());
@@ -258,21 +260,70 @@
             else hideLoading();
             return false;
         }
-        if (msg.action === 'parseSearchHTML') {
-            const results = parseSearchResults(msg.html, msg.excludeAsin);
-            sendResponse({ results });
-            return false;
+        if (msg.action === 'performSearch') {
+            performAmazonSearch(msg.query, msg.excludeAsin)
+                .then(results => sendResponse({ results }))
+                .catch(err => {
+                    console.error('[Content] Search error:', err);
+                    sendResponse({ results: [] });
+                });
+            return true; // async
         }
-        if (msg.action === 'parseProductHTML') {
-            const product = parseProductHTML(msg.html, msg.product);
-            sendResponse({ product });
-            return false;
+        if (msg.action === 'fetchProductDetails') {
+            fetchAllProductDetails(msg.products)
+                .then(products => sendResponse({ products }))
+                .catch(err => {
+                    console.error('[Content] Fetch details error:', err);
+                    sendResponse({ products: msg.products });
+                });
+            return true; // async
         }
     });
 
-    // ─── Background HTML Parsing Helpers ─────────────────────
-    // Parses HTML fetched by the background script, since DOMParser
-    // is not available in Manifest V3 service workers.
+    // ─── Fetch & Parse Helpers executing in Content Script ───
+
+    async function performAmazonSearch(query, excludeAsin) {
+        console.log('[Content] Searching for:', query);
+        const encoded = encodeURIComponent(query);
+        const url = `${window.location.origin}/s?k=${encoded}`;
+
+        try {
+            const response = await fetch(url, { headers: { 'Accept': 'text/html' } });
+            if (!response.ok) {
+                console.warn('[Content] Amazon search returned status:', response.status);
+                return [];
+            }
+            const html = await response.text();
+            const results = parseSearchResults(html, excludeAsin);
+            console.log(`[Content] Found ${results.length} valid results.`);
+            return results;
+        } catch (e) {
+            console.error('[Content] performAmazonSearch failed:', e);
+            return [];
+        }
+    }
+
+    async function fetchAllProductDetails(products) {
+        const detailed = await Promise.allSettled(
+            products.map(p => fetchSingleProduct(p))
+        );
+        return detailed
+            .filter(r => r.status === 'fulfilled' && r.value)
+            .map(r => r.value);
+    }
+
+    async function fetchSingleProduct(product) {
+        try {
+            const url = product.url || `${window.location.origin}/dp/${product.asin}`;
+            const response = await fetch(url, { headers: { 'Accept': 'text/html' } });
+            if (!response.ok) return product;
+
+            const html = await response.text();
+            return parseProductHTML(html, product);
+        } catch (e) {
+            return product;
+        }
+    }
 
     function parseSearchResults(html, excludeAsin) {
         const parser = new DOMParser();
@@ -290,13 +341,21 @@
 
             const linkEl = card.querySelector('h2 a, a.a-link-normal[href*="/dp/"]');
             const href = linkEl ? linkEl.getAttribute('href') : '';
-            const url = href ? (href.startsWith('http') ? href : `https://www.amazon.com${href}`) : '';
+            const url = href ? (href.startsWith('http') ? href : `${window.location.origin}${href}`) : '';
 
             let price = null;
             const priceEl = card.querySelector('.a-price .a-offscreen');
             if (priceEl) {
                 const match = priceEl.textContent.match(/[\d,]+\.?\d*/);
                 if (match) price = parseFloat(match[0].replace(/,/g, ''));
+            } else {
+                const whole = card.querySelector('.a-price-whole');
+                const fraction = card.querySelector('.a-price-fraction');
+                if (whole) {
+                    const w = whole.textContent.replace(/[,.]/g, '');
+                    const f = fraction ? fraction.textContent.replace(/[^0-9]/g, '') : '00';
+                    price = parseFloat(`${w}.${f}`);
+                }
             }
 
             let rating = null;

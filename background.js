@@ -183,100 +183,49 @@ function buildResults(originalProduct, ranked, reviewAnalyses, aiSentiments, dec
 // ─── Amazon Search ─────────────────────────────────────────
 
 async function searchAmazon(query, excludeAsin, tabId) {
-    const encoded = encodeURIComponent(query);
-    const url = `https://www.amazon.com/s?k=${encoded}`;
-
-    try {
-        const response = await fetch(url, {
-            headers: {
-                'Accept': 'text/html',
-                'Accept-Language': 'en-US,en;q=0.9',
-            },
-        });
-
-        if (!response.ok) {
-            console.warn('[BG] Search request failed:', response.status);
-            return [];
-        }
-
-        const html = await response.text();
-
-        // Delegate parsing to the active content script (since DOMParser isn't in MV3 Service Workers)
-        if (!tabId || typeof tabId !== 'number') {
-            console.warn('[BG] Invalid or missing tabId, cannot parse HTML');
-            return [];
-        }
-
-        return new Promise(resolve => {
-            try {
-                chrome.tabs.sendMessage(tabId, { action: 'parseSearchHTML', html, excludeAsin }, (res) => {
-                    if (chrome.runtime.lastError) {
-                        console.warn('[BG] Content script messaging failed:', chrome.runtime.lastError.message);
-                        resolve([]);
-                    } else {
-                        resolve(res?.results || []);
-                    }
-                });
-            } catch (err) {
-                console.warn('[BG] tabs.sendMessage sync error:', err.message);
-                resolve([]);
-            }
-        });
-    } catch (err) {
-        console.error('[BG] Search error:', err);
+    if (!tabId || typeof tabId !== 'number') {
+        console.warn('[BG] Invalid or missing tabId, cannot perform Amazon search');
         return [];
     }
+
+    return new Promise(resolve => {
+        try {
+            chrome.tabs.sendMessage(tabId, { action: 'performSearch', query, excludeAsin }, (res) => {
+                if (chrome.runtime.lastError) {
+                    console.warn('[BG] Content script performSearch failed:', chrome.runtime.lastError.message);
+                    resolve([]);
+                } else {
+                    resolve(res?.results || []);
+                }
+            });
+        } catch (err) {
+            console.warn('[BG] tabs.sendMessage sync error during search:', err.message);
+            resolve([]);
+        }
+    });
 }
 
 // ─── Fetch Product Details ─────────────────────────────────
 
 async function fetchProductDetails(products, tabId) {
-    const detailed = await Promise.allSettled(
-        products.map(p => fetchSingleProduct(p, tabId))
-    );
-
-    return detailed
-        .filter(r => r.status === 'fulfilled' && r.value)
-        .map(r => r.value);
-}
-
-async function fetchSingleProduct(product, tabId) {
-    try {
-        const url = product.url || `https://www.amazon.com/dp/${product.asin}`;
-        const response = await fetch(url, {
-            headers: {
-                'Accept': 'text/html',
-                'Accept-Language': 'en-US,en;q=0.9',
-            },
-        });
-
-        if (!response.ok) return product;
-
-        const html = await response.text();
-
-        // Delegate parsing to the active content script
-        if (!tabId || typeof tabId !== 'number') {
-            console.warn(`[BG] Invalid tabId, cannot parse HTML for ${product.asin}`);
-            return product;
-        }
-
-        return new Promise(resolve => {
-            try {
-                chrome.tabs.sendMessage(tabId, { action: 'parseProductHTML', html, product }, (res) => {
-                    if (chrome.runtime.lastError) {
-                        console.warn(`[BG] Content script messaging failed for ${product.asin}:`, chrome.runtime.lastError.message);
-                        resolve(product);
-                    } else {
-                        resolve(res?.product || product);
-                    }
-                });
-            } catch (err) {
-                console.warn(`[BG] tabs.sendMessage sync error for ${product.asin}:`, err.message);
-                resolve(product);
-            }
-        });
-    } catch (err) {
-        console.warn('[BG] Failed to fetch details for', product.asin, err);
-        return product;
+    if (!tabId || typeof tabId !== 'number') {
+        console.warn(`[BG] Invalid tabId, cannot fetch details for ${products.length} products`);
+        return products;
     }
+
+    return new Promise(resolve => {
+        try {
+            chrome.tabs.sendMessage(tabId, { action: 'fetchProductDetails', products }, (res) => {
+                if (chrome.runtime.lastError) {
+                    console.warn(`[BG] Content script fetchProductDetails failed:`, chrome.runtime.lastError.message);
+                    resolve(products);
+                } else {
+                    resolve(res?.products || products);
+                }
+            });
+        } catch (err) {
+            console.warn(`[BG] tabs.sendMessage sync error during detail fetch:`, err.message);
+            resolve(products);
+        }
+    });
 }
