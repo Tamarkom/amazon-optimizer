@@ -17,8 +17,7 @@
     "*://*.amazon.ca/*"
   ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
@@ -36,8 +35,12 @@
         "*://*.amazon.ca/gp/product/*",
         "*://*.amazon.ca/*/dp/*"
       ],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
   ],
