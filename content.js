@@ -214,8 +214,9 @@
                     hideLoading();
                     if (response?.error) {
                         showNotification(response.error, 'error');
+                    } else if (response?.success) {
+                        showNotification('Optimization complete! Click the ⚡ extension icon in your toolbar to see the best deals.', 'success');
                     }
-                    // Results will be displayed via the popup
                 }
             );
         } catch (err) {

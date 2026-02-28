@@ -57,28 +57,35 @@ async function handleOptimize(product, tabId) {
         const aiAvailable = await AIEngine.isAIAvailable();
         let searchQuery;
 
+        console.log('[BG] AI Available:', aiAvailable);
+
         if (aiAvailable) {
+            console.log('[BG] Generating AI search query for:', product.title);
             searchQuery = await AIEngine.buildSearchQuery(product.title);
             await new Promise(r => setTimeout(r, 500)); // Rate limit safety
         }
 
         if (!searchQuery) {
+            console.log('[BG] Using fallback search query');
             searchQuery = ScoringEngine.buildSearchQueryFallback(product.title);
         }
 
-        console.log('[BG] Search query:', searchQuery);
+        console.log('[BG] Final search query:', searchQuery);
 
         // Step 2: Search Amazon for similar products
+        console.log('[BG] Searching Amazon...');
         const searchResults = await searchAmazon(searchQuery, product.asin);
-        console.log('[BG] Found', searchResults.length, 'search results');
+        console.log('[BG] Found', searchResults.length, 'potential candidates');
 
         if (searchResults.length === 0) {
+            console.warn('[BG] No similar products found on Amazon search.');
             return buildResults(product, [], {}, {}, '', aiAvailable);
         }
 
         // Step 3: Fetch detail pages for top results (parallel)
+        console.log('[BG] Fetching details for top', Math.min(8, searchResults.length), 'products...');
         const detailedProducts = await fetchProductDetails(searchResults.slice(0, 8));
-        console.log('[BG] Fetched details for', detailedProducts.length, 'products');
+        console.log('[BG] Successfully fetched', detailedProducts.length, 'detailed products');
 
         // Step 4: Include the original product
         const allProducts = [
@@ -90,8 +97,10 @@ async function handleOptimize(product, tabId) {
         let reviewAnalyses = {};
         if (aiAvailable) {
             try {
+                console.log('[BG] Starting batch AI review analysis...');
                 // Batch all reviews into ONE AI call (saves quota/prevents 429)
                 reviewAnalyses = await AIEngine.analyzeReviewsBatch(allProducts);
+                console.log('[BG] Review analysis complete for', Object.keys(reviewAnalyses).length, 'products');
                 await new Promise(r => setTimeout(r, 500)); // Rate limit safety
             } catch (err) {
                 console.warn('[BG] Batch review analysis failed:', err);
@@ -99,6 +108,7 @@ async function handleOptimize(product, tabId) {
         }
 
         // Step 6: Deterministic scoring
+        console.log('[BG] Scoring products...');
         const aiSentiments = {};
         Object.entries(reviewAnalyses).forEach(([asin, analysis]) => {
             aiSentiments[asin] = analysis.sentimentScore || 50;
@@ -107,10 +117,12 @@ async function handleOptimize(product, tabId) {
         const ranked = ScoringEngine.scoreProducts(allProducts,
             Object.keys(aiSentiments).length > 0 ? aiSentiments : null
         );
+        console.log('[BG] Scoring complete. Top product score:', ranked[0]?.score);
 
         // Step 7: AI decision review
         let decisionReview = '';
         if (aiAvailable) {
+            console.log('[BG] Generating AI decision summary...');
             decisionReview = await AIEngine.writeDecisionReview(ranked, reviewAnalyses);
         }
         if (!decisionReview) {
