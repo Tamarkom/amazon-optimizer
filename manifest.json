@@ -1,3 +1,6 @@
+{
+  "manifest_version": 3,
+  "name": "Amazon Shopping Optimizer",
   "version": "1.0.9",
   "description": "Find the best deal on Amazon — AI-powered product comparison with smart scoring.",
   "permissions": [
