@@ -174,7 +174,7 @@ function buildResults(originalProduct, ranked, reviewAnalyses, aiSentiments, dec
 
 // ─── Amazon Search ─────────────────────────────────────────
 
-async function searchAmazon(query, excludeAsin) {
+async function searchAmazon(query, excludeAsin, tabId) {
     const encoded = encodeURIComponent(query);
     const url = `https://www.amazon.com/s?k=${encoded}`;
 
@@ -192,88 +192,29 @@ async function searchAmazon(query, excludeAsin) {
         }
 
         const html = await response.text();
-        return parseSearchResults(html, excludeAsin);
+
+        // Delegate parsing to the active content script (since DOMParser isn't in MV3 Service Workers)
+        return new Promise(resolve => {
+            chrome.tabs.sendMessage(tabId, { action: 'parseSearchHTML', html, excludeAsin }, (res) => {
+                if (chrome.runtime.lastError) {
+                    console.warn('[BG] Content script messaging failed:', chrome.runtime.lastError.message);
+                    resolve([]);
+                } else {
+                    resolve(res?.results || []);
+                }
+            });
+        });
     } catch (err) {
         console.error('[BG] Search error:', err);
         return [];
     }
 }
 
-/**
- * Parse search results from Amazon HTML.
- */
-function parseSearchResults(html, excludeAsin) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const results = [];
-
-    const cards = doc.querySelectorAll('[data-component-type="s-search-result"]');
-
-    cards.forEach(card => {
-        const asin = card.getAttribute('data-asin');
-        if (!asin || asin === excludeAsin) return;
-
-        // Title
-        const titleEl = card.querySelector('h2 span, .a-text-normal, h2 a span');
-        const title = titleEl ? titleEl.textContent.trim() : '';
-        if (!title) return;
-
-        // URL
-        const linkEl = card.querySelector('h2 a, a.a-link-normal[href*="/dp/"]');
-        const href = linkEl ? linkEl.getAttribute('href') : '';
-        const url = href ? (href.startsWith('http') ? href : `https://www.amazon.com${href}`) : '';
-
-        // Price
-        let price = null;
-        const priceEl = card.querySelector('.a-price .a-offscreen');
-        if (priceEl) {
-            const match = priceEl.textContent.match(/[\d,]+\.?\d*/);
-            if (match) price = parseFloat(match[0].replace(/,/g, ''));
-        }
-
-        // Rating
-        let rating = null;
-        const ratingEl = card.querySelector('.a-icon-star-small .a-icon-alt, .a-icon-star .a-icon-alt');
-        if (ratingEl) {
-            const match = ratingEl.textContent.match(/([\d.]+)/);
-            if (match) rating = parseFloat(match[1]);
-        }
-
-        // Review count
-        let reviewCount = 0;
-        const reviewEl = card.querySelector('.a-size-base.s-underline-text, [aria-label*="stars"] + span');
-        if (reviewEl) {
-            const match = reviewEl.textContent.match(/([\d,]+)/);
-            if (match) reviewCount = parseInt(match[1].replace(/,/g, ''), 10);
-        }
-
-        // Image
-        const imgEl = card.querySelector('.s-image');
-        const imageUrl = imgEl ? imgEl.getAttribute('src') : '';
-
-        // Prime badge
-        const isPrime = !!card.querySelector('.a-icon-prime, .s-prime');
-
-        results.push({
-            asin,
-            title,
-            price,
-            rating,
-            reviewCount,
-            shipping: { isPrime, isFree: isPrime, cost: null },
-            imageUrl,
-            url,
-        });
-    });
-
-    return results.filter(r => r.price !== null).slice(0, 12);
-}
-
 // ─── Fetch Product Details ─────────────────────────────────
 
-async function fetchProductDetails(products) {
+async function fetchProductDetails(products, tabId) {
     const detailed = await Promise.allSettled(
-        products.map(p => fetchSingleProduct(p))
+        products.map(p => fetchSingleProduct(p, tabId))
     );
 
     return detailed
@@ -281,7 +222,7 @@ async function fetchProductDetails(products) {
         .map(r => r.value);
 }
 
-async function fetchSingleProduct(product) {
+async function fetchSingleProduct(product, tabId) {
     try {
         const url = product.url || `https://www.amazon.com/dp/${product.asin}`;
         const response = await fetch(url, {
@@ -294,32 +235,18 @@ async function fetchSingleProduct(product) {
         if (!response.ok) return product;
 
         const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
 
-        // Extract more detailed info
-        const enriched = { ...product };
-
-        // Better price from detail page
-        if (!enriched.price) {
-            const priceEl = doc.querySelector('.a-price .a-offscreen, #priceblock_ourprice');
-            if (priceEl) {
-                const match = priceEl.textContent.match(/[\d,]+\.?\d*/);
-                if (match) enriched.price = parseFloat(match[0].replace(/,/g, ''));
-            }
-        }
-
-        // Reviews text for AI analysis
-        enriched.reviewTexts = [];
-        const reviewEls = doc.querySelectorAll('[data-hook="review-body"] span, #cm-cr-dp-review-list .review-text-content span');
-        reviewEls.forEach((el, i) => {
-            if (i < 8) {
-                const text = el.textContent.trim();
-                if (text.length > 20) enriched.reviewTexts.push(text);
-            }
+        // Delegate parsing to the active content script
+        return new Promise(resolve => {
+            chrome.tabs.sendMessage(tabId, { action: 'parseProductHTML', html, product }, (res) => {
+                if (chrome.runtime.lastError) {
+                    console.warn(`[BG] Content script messaging failed for ${product.asin}:`, chrome.runtime.lastError.message);
+                    resolve(product);
+                } else {
+                    resolve(res?.product || product);
+                }
+            });
         });
-
-        return enriched;
     } catch (err) {
         console.warn('[BG] Failed to fetch details for', product.asin, err);
         return product;

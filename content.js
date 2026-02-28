@@ -246,15 +246,110 @@
 
     // ─── Listen for messages from background/popup ───────────
 
+    // ─── Listen for messages from background/popup ───────────
+
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg.action === 'getProductData') {
             sendResponse(extractProductData());
+            return false;
         }
         if (msg.action === 'optimizeStatus') {
             if (msg.status === 'loading') showLoading();
             else hideLoading();
+            return false;
+        }
+        if (msg.action === 'parseSearchHTML') {
+            const results = parseSearchResults(msg.html, msg.excludeAsin);
+            sendResponse({ results });
+            return false;
+        }
+        if (msg.action === 'parseProductHTML') {
+            const product = parseProductHTML(msg.html, msg.product);
+            sendResponse({ product });
+            return false;
         }
     });
+
+    // ─── Background HTML Parsing Helpers ─────────────────────
+    // Parses HTML fetched by the background script, since DOMParser
+    // is not available in Manifest V3 service workers.
+
+    function parseSearchResults(html, excludeAsin) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const results = [];
+        const cards = doc.querySelectorAll('[data-component-type="s-search-result"]');
+
+        cards.forEach(card => {
+            const asin = card.getAttribute('data-asin');
+            if (!asin || asin === excludeAsin) return;
+
+            const titleEl = card.querySelector('h2 span, .a-text-normal, h2 a span');
+            const title = titleEl ? titleEl.textContent.trim() : '';
+            if (!title) return;
+
+            const linkEl = card.querySelector('h2 a, a.a-link-normal[href*="/dp/"]');
+            const href = linkEl ? linkEl.getAttribute('href') : '';
+            const url = href ? (href.startsWith('http') ? href : `https://www.amazon.com${href}`) : '';
+
+            let price = null;
+            const priceEl = card.querySelector('.a-price .a-offscreen');
+            if (priceEl) {
+                const match = priceEl.textContent.match(/[\d,]+\.?\d*/);
+                if (match) price = parseFloat(match[0].replace(/,/g, ''));
+            }
+
+            let rating = null;
+            const ratingEl = card.querySelector('.a-icon-star-small .a-icon-alt, .a-icon-star .a-icon-alt');
+            if (ratingEl) {
+                const match = ratingEl.textContent.match(/([\d.]+)/);
+                if (match) rating = parseFloat(match[1]);
+            }
+
+            let reviewCount = 0;
+            const reviewEl = card.querySelector('.a-size-base.s-underline-text, [aria-label*="stars"] + span');
+            if (reviewEl) {
+                const match = reviewEl.textContent.match(/([\d,]+)/);
+                if (match) reviewCount = parseInt(match[1].replace(/,/g, ''), 10);
+            }
+
+            const imgEl = card.querySelector('.s-image');
+            const imageUrl = imgEl ? imgEl.getAttribute('src') : '';
+            const isPrime = !!card.querySelector('.a-icon-prime, .s-prime');
+
+            results.push({
+                asin, title, price, rating, reviewCount,
+                shipping: { isPrime, isFree: isPrime, cost: null },
+                imageUrl, url,
+            });
+        });
+        return results.filter(r => r.price !== null).slice(0, 12);
+    }
+
+    function parseProductHTML(html, baseProduct) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const enriched = { ...baseProduct };
+
+        if (!enriched.price) {
+            const priceEl = doc.querySelector('.a-price .a-offscreen, #priceblock_ourprice');
+            if (priceEl) {
+                const match = priceEl.textContent.match(/[\d,]+\.?\d*/);
+                if (match) enriched.price = parseFloat(match[0].replace(/,/g, ''));
+            }
+        }
+
+        enriched.reviewTexts = [];
+        const reviewEls = doc.querySelectorAll('[data-hook="review-body"] span, #cm-cr-dp-review-list .review-text-content span');
+        reviewEls.forEach((el, i) => {
+            if (i < 8) {
+                const text = el.textContent.trim();
+                if (text.length > 20) enriched.reviewTexts.push(text);
+            }
+        });
+
+        return enriched;
+    }
 
     // ─── Initialize ──────────────────────────────────────────
 
