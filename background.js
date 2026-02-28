@@ -57,6 +57,7 @@ async function handleOptimize(product, tabId) {
 
         if (aiAvailable) {
             searchQuery = await AIEngine.buildSearchQuery(product.title);
+            await new Promise(r => setTimeout(r, 500)); // Rate limit safety
         }
 
         if (!searchQuery) {
@@ -86,13 +87,19 @@ async function handleOptimize(product, tabId) {
         // Step 5: AI review analysis (if available)
         let reviewAnalyses = {};
         if (aiAvailable) {
-            reviewAnalyses = await analyzeAllReviews(allProducts);
+            try {
+                // Batch all reviews into ONE AI call (saves quota/prevents 429)
+                reviewAnalyses = await AIEngine.analyzeReviewsBatch(allProducts);
+                await new Promise(r => setTimeout(r, 500)); // Rate limit safety
+            } catch (err) {
+                console.warn('[BG] Batch review analysis failed:', err);
+            }
         }
 
         // Step 6: Deterministic scoring
         const aiSentiments = {};
         Object.entries(reviewAnalyses).forEach(([asin, analysis]) => {
-            aiSentiments[asin] = analysis.sentimentScore;
+            aiSentiments[asin] = analysis.sentimentScore || 50;
         });
 
         const ranked = ScoringEngine.scoreProducts(allProducts,
@@ -298,24 +305,4 @@ async function fetchSingleProduct(product) {
         console.warn('[BG] Failed to fetch details for', product.asin, err);
         return product;
     }
-}
-
-// ─── Batch Review Analysis ─────────────────────────────────
-
-async function analyzeAllReviews(products) {
-    const analyses = {};
-
-    const promises = products
-        .filter(p => p.reviewTexts && p.reviewTexts.length > 0)
-        .map(async (p) => {
-            try {
-                const analysis = await AIEngine.analyzeReviews(p.title, p.reviewTexts);
-                analyses[p.asin] = analysis;
-            } catch (err) {
-                console.warn('[BG] Review analysis failed for', p.asin, err);
-            }
-        });
-
-    await Promise.allSettled(promises);
-    return analyses;
 }

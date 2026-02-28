@@ -196,6 +196,57 @@ Return ONLY a JSON object with this exact structure:
     }
 }
 
+/**
+ * Batch analyze reviews for multiple products in one call to stay under 15 RPM.
+ * @param {Array<object>} products - Array of product objects with .title, .asin, and .reviewTexts
+ * @returns {Promise<object>} map of ASIN -> results
+ */
+async function analyzeReviewsBatch(products) {
+    const validProducts = products.filter(p => p.reviewTexts && p.reviewTexts.length > 0);
+    if (!validProducts.length) return {};
+
+    const batchText = validProducts
+        .map((p, i) => `PROD ${i + 1} (${p.asin}): "${p.title}"\nReviews:\n${p.reviewTexts.slice(0, 5).join('\n---\n')}`)
+        .join('\n\n====================\n\n');
+
+    const prompt = `Analyze these products' reviews and return a structured assessment for EACH product.
+
+${batchText}
+
+Return ONLY a JSON map with ASINs as keys:
+{
+  "ASIN_123": {
+    "sentimentScore": <number 0-100>,
+    "pros": [<top 2 positive themes>],
+    "cons": [<top 1 negative theme>],
+    "qualityFlag": <one of: "excellent", "reliable", "mixed", "concerning", "poor">,
+    "summary": <1 sentence summary>
+  },
+  ...
+}`;
+
+    try {
+        const response = await callAI(prompt, { temperature: 0.2, maxTokens: 1024 });
+        const parsed = JSON.parse(response);
+
+        // Clean up response objects to ensure they have the correct keys
+        const results = {};
+        Object.entries(parsed).forEach(([asin, data]) => {
+            results[asin] = {
+                sentimentScore: Math.max(0, Math.min(100, data.sentimentScore || 50)),
+                pros: data.pros || [],
+                cons: data.cons || [],
+                qualityFlag: data.qualityFlag || 'unknown',
+                summary: data.summary || '',
+            };
+        });
+        return results;
+    } catch (err) {
+        console.warn('[AI] Batch review analysis failed:', err.message);
+        return {};
+    }
+}
+
 // ─── Decision Review ─────────────────────────────────────────
 
 /**
@@ -250,6 +301,7 @@ if (typeof globalThis !== 'undefined') {
         getAIConfig,
         buildSearchQuery,
         analyzeReviews,
+        analyzeReviewsBatch,
         writeDecisionReview,
     };
 }

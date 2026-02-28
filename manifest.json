@@ -14,7 +14,8 @@
     "*://*.amazon.de/*",
     "*://*.amazon.fr/*",
     "*://*.amazon.co.jp/*",
-    "*://*.amazon.ca/*"
+    "*://*.amazon.ca/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "background": {
     "service_worker": "background.js"
