@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         aiLabel: document.querySelector('.ai-label'),
         decisionReview: document.getElementById('decisionReview'),
         reviewText: document.getElementById('reviewText'),
+        savingsBanner: document.getElementById('savingsBanner'),
+        savingsText: document.getElementById('savingsText'),
         productList: document.getElementById('productList'),
         errorMessage: document.getElementById('errorMessage'),
         settingsBtn: document.getElementById('settingsBtn'),
@@ -86,6 +88,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             elements.decisionReview.classList.add('hidden');
         }
+
+        // Savings Banner
+        renderSavingsBanner(results.products);
 
         // Product cards
         elements.productList.innerHTML = '';
@@ -186,6 +191,64 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         return card;
+    }
+
+    // ─── Savings Banner ──────────────────────────────────
+
+    function renderSavingsBanner(products) {
+        if (!products || products.length < 2) {
+            elements.savingsBanner.classList.add('hidden');
+            return;
+        }
+
+        const original = products.find(p => p.isOriginal);
+        const bestValue = products.find(p => p.isBestValue);
+
+        if (!original || !bestValue) {
+            elements.savingsBanner.classList.add('hidden');
+            return;
+        }
+
+        // If the original IS the best value
+        if (original.asin === bestValue.asin) {
+            elements.savingsBanner.classList.remove('hidden');
+            elements.savingsBanner.classList.add('no-savings');
+            elements.savingsText.innerHTML = '✓ You already picked the best deal! No better option found.';
+            return;
+        }
+
+        elements.savingsBanner.classList.remove('no-savings');
+
+        // Compare by unit price if both have quantities
+        const useUnitPrice = original.quantity > 1 || bestValue.quantity > 1;
+
+        if (useUnitPrice && original.unitPrice && bestValue.unitPrice && isFinite(original.unitPrice) && isFinite(bestValue.unitPrice)) {
+            const savedPerUnit = original.unitPrice - bestValue.unitPrice;
+            if (savedPerUnit > 0) {
+                const pctSaved = Math.round((savedPerUnit / original.unitPrice) * 100);
+                const totalSaved = savedPerUnit * (original.quantity || 1);
+                elements.savingsBanner.classList.remove('hidden');
+                elements.savingsText.innerHTML = `Save <span class="savings-amount">$${savedPerUnit.toFixed(2)}/unit (${pctSaved}%)</span> by switching — that's <span class="savings-amount">$${totalSaved.toFixed(2)} saved</span> on this purchase!`;
+            } else {
+                // Best value is better on overall score but not cheaper per unit
+                const scoreDiff = bestValue.score - original.score;
+                elements.savingsBanner.classList.remove('hidden');
+                elements.savingsText.innerHTML = `Better deal found — <span class="savings-amount">+${scoreDiff} points</span> higher score with better reviews and shipping.`;
+            }
+        } else if (original.price && bestValue.price) {
+            const saved = original.price - bestValue.price;
+            if (saved > 0) {
+                const pctSaved = Math.round((saved / original.price) * 100);
+                elements.savingsBanner.classList.remove('hidden');
+                elements.savingsText.innerHTML = `Save <span class="savings-amount">$${saved.toFixed(2)} (${pctSaved}%)</span> by switching to the top-rated option!`;
+            } else {
+                const scoreDiff = bestValue.score - original.score;
+                elements.savingsBanner.classList.remove('hidden');
+                elements.savingsText.innerHTML = `Better deal found — <span class="savings-amount">+${scoreDiff} points</span> higher score with better reviews and shipping.`;
+            }
+        } else {
+            elements.savingsBanner.classList.add('hidden');
+        }
     }
 
     // ─── Helpers ──────────────────────────────────────────

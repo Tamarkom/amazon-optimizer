@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=620">
@@ -7,6 +8,7 @@
   <link rel="stylesheet" href="popup.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
+
 <body>
   <!-- Header -->
   <header class="header">
@@ -54,6 +56,12 @@
       <p id="reviewText" class="review-text"></p>
     </div>
 
+    <!-- Savings Banner -->
+    <div id="savingsBanner" class="savings-banner hidden">
+      <span class="savings-icon">💰</span>
+      <span id="savingsText" class="savings-text"></span>
+    </div>
+
     <!-- Product Cards -->
     <div id="productList" class="product-list"></div>
 
@@ -75,4 +83,5 @@
 
   <script src="popup.js"></script>
 </body>
+
 </html>
