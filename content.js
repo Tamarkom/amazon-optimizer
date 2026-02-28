@@ -335,7 +335,7 @@
             const asin = card.getAttribute('data-asin');
             if (!asin || asin === excludeAsin) return;
 
-            const titleEl = card.querySelector('h2 span, .a-text-normal, h2 a span');
+            const titleEl = card.querySelector('h2 span, h2 a span, .a-text-normal, [data-cy="title-recipe"] span');
             const title = titleEl ? titleEl.textContent.trim() : '';
             if (!title) return;
 
@@ -344,17 +344,20 @@
             const url = href ? (href.startsWith('http') ? href : `${window.location.origin}${href}`) : '';
 
             let price = null;
-            const priceEl = card.querySelector('.a-price .a-offscreen');
-            if (priceEl) {
-                const match = priceEl.textContent.match(/[\d,]+\.?\d*/);
-                if (match) price = parseFloat(match[0].replace(/,/g, ''));
-            } else {
-                const whole = card.querySelector('.a-price-whole');
-                const fraction = card.querySelector('.a-price-fraction');
-                if (whole) {
-                    const w = whole.textContent.replace(/[,.]/g, '');
-                    const f = fraction ? fraction.textContent.replace(/[^0-9]/g, '') : '00';
+            const priceContainer = card.querySelector('.a-price');
+            if (priceContainer) {
+                const whole = priceContainer.querySelector('.a-price-whole');
+                const fraction = priceContainer.querySelector('.a-price-fraction');
+                if (whole && fraction) {
+                    const w = whole.textContent.replace(/[^0-9]/g, '');
+                    const f = fraction.textContent.replace(/[^0-9]/g, '');
                     price = parseFloat(`${w}.${f}`);
+                } else {
+                    const offscreen = priceContainer.querySelector('.a-offscreen');
+                    if (offscreen && offscreen.textContent) {
+                        const match = offscreen.textContent.match(/[\d,]+\.?\d*/);
+                        if (match) price = parseFloat(match[0].replace(/,/g, ''));
+                    }
                 }
             }
 
