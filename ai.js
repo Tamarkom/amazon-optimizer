@@ -11,15 +11,14 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemi
 
 /**
  * Get AI configuration from storage.
- * @returns {Promise<{mode: string, apiKey: string, backendUrl: string, authToken: string}>}
+ * @returns {Promise<{mode: string, apiKey: string, backendUrl: string, authToken: string, model: string, endpoint: string}>}
  */
 async function getAIConfig() {
     return new Promise(resolve => {
         chrome.storage.local.get(
-            ['aiMode', 'geminiApiKey', 'backendUrl', 'authToken'],
+            ['aiMode', 'geminiApiKey', 'backendUrl', 'authToken', 'detectedModel', 'detectedEndpoint'],
             (result) => {
                 const apiKey = result.geminiApiKey || '';
-                // Safety check: Don't allow the placeholder key
                 const isPlaceholder = apiKey.startsWith('AIzaSy') && apiKey.length < 30;
 
                 resolve({
@@ -27,6 +26,8 @@ async function getAIConfig() {
                     apiKey: isPlaceholder ? '' : apiKey,
                     backendUrl: result.backendUrl || '',
                     authToken: result.authToken || '',
+                    model: result.detectedModel || 'gemini-1.5-flash',
+                    endpoint: result.detectedEndpoint || 'v1'
                 });
             }
         );
@@ -59,7 +60,8 @@ async function callAI(prompt, options = {}, retries = 3, delay = 2000) {
                 throw new Error('MISSING_API_KEY');
             }
 
-            const response = await fetch(`${GEMINI_API_URL}?key=${config.apiKey}`, {
+            const url = `https://generativelanguage.googleapis.com/${config.endpoint}/models/${config.model}:generateContent?key=${config.apiKey}`;
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -54,41 +54,59 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        showResult(els.testResult, 'Testing connection...', 'neutral');
+        showResult(els.testResult, 'Detecting working model for your key...', 'neutral');
 
-        const testConnection = async (retries = 1) => {
-            try {
-                // Use v1 (Stable) for the most stable test
-                const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`;
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: 'Say "ok".' }] }],
-                        generationConfig: { maxOutputTokens: 5 },
-                    }),
-                });
+        // List of models to try (Google varies these by region/account)
+        const modelsToTry = [
+            'gemini-1.5-flash',
+            'gemini-1.5-flash-latest',
+            'gemini-2.0-flash-001',
+            'gemini-pro'
+        ];
 
-                if (response.ok) {
-                    showResult(els.testResult, '✓ Connected! Gemini 1.5 Flash is ready.', 'ok');
-                    return true;
-                } else if (response.status === 429 && retries > 0) {
-                    showResult(els.testResult, 'Rate limited. Retrying in 5s...', 'neutral');
-                    await new Promise(r => setTimeout(r, 5000));
-                    return testConnection(retries - 1);
-                } else {
-                    const errData = await response.json().catch(() => ({}));
-                    const msg = errData.error?.message || `Status: ${response.status}`;
-                    showResult(els.testResult, `✗ Error: ${msg}. If this is a new key, wait 5 min.`, 'err');
-                    return false;
+        const endpoints = ['v1', 'v1beta'];
+        let workingModel = null;
+        let workingEndpoint = null;
+        let lastError = '';
+
+        for (const endpoint of endpoints) {
+            for (const model of modelsToTry) {
+                try {
+                    const url = `https://generativelanguage.googleapis.com/${endpoint}/models/${model}:generateContent?key=${key}`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: 'a' }] }],
+                            generationConfig: { maxOutputTokens: 2 },
+                        }),
+                    });
+
+                    if (response.ok) {
+                        workingModel = model;
+                        workingEndpoint = endpoint;
+                        break;
+                    } else {
+                        const data = await response.json().catch(() => ({}));
+                        lastError = data.error?.message || `Status: ${response.status}`;
+                    }
+                } catch (e) {
+                    lastError = e.message;
                 }
-            } catch (err) {
-                showResult(els.testResult, `✗ Network error: ${err.message}`, 'err');
-                return false;
             }
-        };
+            if (workingModel) break;
+        }
 
-        await testConnection();
+        if (workingModel) {
+            // Save the detected working model and endpoint
+            chrome.storage.local.set({
+                detectedModel: workingModel,
+                detectedEndpoint: workingEndpoint
+            });
+            showResult(els.testResult, `✓ Success! Found working model: ${workingModel} (${workingEndpoint})`, 'ok');
+        } else {
+            showResult(els.testResult, `✗ All models failed. Google's reason: ${lastError}`, 'err');
+        }
     });
 
     // ─── Save ─────────────────────────────────────────────
