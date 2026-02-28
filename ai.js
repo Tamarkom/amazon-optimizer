@@ -4,8 +4,8 @@
 // Supports dev mode (direct API) and production mode (backend proxy).
 // ============================================================
 
-// Use 1.5 Flash for better Free Tier reliability
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+// Use v1 (Stable) endpoint for maximum compatibility
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent';
 
 // ─── Configuration ───────────────────────────────────────────
 
