@@ -54,47 +54,71 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        showResult(els.testResult, 'Detecting working model for your key...', 'neutral');
+        showResult(els.testResult, 'Fetching available models from Google...', 'neutral');
 
-        // List of models to try (Google varies these by region/account)
-        const modelsToTry = [
-            'gemini-1.5-flash',
-            'gemini-1.5-flash-latest',
-            'gemini-2.0-flash-001',
-            'gemini-pro'
-        ];
-
-        const endpoints = ['v1', 'v1beta'];
         let workingModel = null;
-        let workingEndpoint = null;
+        let workingEndpoint = 'v1beta';
         let lastError = '';
 
-        for (const endpoint of endpoints) {
-            for (const model of modelsToTry) {
-                try {
-                    const url = `https://generativelanguage.googleapis.com/${endpoint}/models/${model}:generateContent?key=${key}`;
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: 'a' }] }],
-                            generationConfig: { maxOutputTokens: 2 },
-                        }),
-                    });
+        try {
+            // Ask Google what models this specific API key is actually allowed to use
+            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+            const listRes = await fetch(listUrl);
 
-                    if (response.ok) {
-                        workingModel = model;
-                        workingEndpoint = endpoint;
-                        break;
-                    } else {
-                        const data = await response.json().catch(() => ({}));
-                        lastError = data.error?.message || `Status: ${response.status}`;
-                    }
-                } catch (e) {
-                    lastError = e.message;
+            if (!listRes.ok) {
+                const errData = await listRes.json().catch(() => ({}));
+                throw new Error(errData.error?.message || `API Key rejected (Status: ${listRes.status})`);
+            }
+
+            const listData = await listRes.json();
+
+            // Find a valid flash model that supports text generation
+            const validModels = listData.models || [];
+            const flashModels = validModels.filter(m =>
+                m.supportedGenerationMethods?.includes('generateContent') &&
+                m.name.includes('flash')
+            );
+
+            if (flashModels.length > 0) {
+                // Prefer 1.5 flash, or take the first one available
+                const preferred = flashModels.find(m => m.name.includes('1.5-flash')) || flashModels[0];
+                // The name comes back as "models/gemini-1.5-flash", we need to strip "models/"
+                workingModel = preferred.name.replace('models/', '');
+            } else {
+                // Fallback to pro if flash isn't available
+                const proModels = validModels.filter(m =>
+                    m.supportedGenerationMethods?.includes('generateContent') &&
+                    m.name.includes('pro')
+                );
+
+                if (proModels.length > 0) {
+                    workingModel = proModels[0].name.replace('models/', '');
+                } else {
+                    throw new Error('Your API key has no access to Gemini Flash or Pro models for generation.');
                 }
             }
-            if (workingModel) break;
+
+            // Test the specific model we found just to be absolutely sure
+            showResult(els.testResult, `Found approved model: ${workingModel}. Testing it...`, 'neutral');
+
+            const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${workingModel}:generateContent?key=${key}`;
+            const testRes = await fetch(testUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: 'a' }] }],
+                    generationConfig: { maxOutputTokens: 2 },
+                }),
+            });
+
+            if (!testRes.ok) {
+                const errData = await testRes.json().catch(() => ({}));
+                throw new Error(errData.error?.message || `Test failed with status ${testRes.status}`);
+            }
+
+        } catch (e) {
+            lastError = e.message;
+            workingModel = null;
         }
 
         if (workingModel) {
@@ -103,9 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 detectedModel: workingModel,
                 detectedEndpoint: workingEndpoint
             });
-            showResult(els.testResult, `✓ Success! Found working model: ${workingModel} (${workingEndpoint})`, 'ok');
+            showResult(els.testResult, `✓ Success! Auto-configured to your approved model: ${workingModel}`, 'ok');
         } else {
-            showResult(els.testResult, `✗ All models failed. Google's reason: ${lastError}`, 'err');
+            showResult(els.testResult, `✗ Error: ${lastError}`, 'err');
         }
     });
 
