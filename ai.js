@@ -4,7 +4,8 @@
 // Supports dev mode (direct API) and production mode (backend proxy).
 // ============================================================
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+// Use 1.5 Flash for better Free Tier reliability
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 // ─── Configuration ───────────────────────────────────────────
 
@@ -17,9 +18,13 @@ async function getAIConfig() {
         chrome.storage.local.get(
             ['aiMode', 'geminiApiKey', 'backendUrl', 'authToken'],
             (result) => {
+                const apiKey = result.geminiApiKey || '';
+                // Safety check: Don't allow the placeholder key
+                const isPlaceholder = apiKey.startsWith('AIzaSy') && apiKey.length < 30;
+
                 resolve({
-                    mode: result.aiMode || 'dev',           // 'dev' or 'production'
-                    apiKey: result.geminiApiKey || '',
+                    mode: result.aiMode || 'dev',
+                    apiKey: isPlaceholder ? '' : apiKey,
                     backendUrl: result.backendUrl || '',
                     authToken: result.authToken || '',
                 });
@@ -39,67 +44,83 @@ async function isAIAvailable() {
     return false;
 }
 
-// ─── Gemini API Call ─────────────────────────────────────────
+// ─── Gemini API Call with Retry Logic ────────────────────────
 
 /**
- * Call the Gemini API (dev mode) or backend proxy (production mode).
- * @param {string} prompt
- * @param {object} options - { temperature, maxTokens }
- * @returns {Promise<string>} response text
+ * Call the Gemini API with automatic retries for 429 errors.
  */
-async function callAI(prompt, options = {}) {
+async function callAI(prompt, options = {}, retries = 3, delay = 2000) {
     const config = await getAIConfig();
     const { temperature = 0.3, maxTokens = 1024 } = options;
 
-    if (config.mode === 'dev') {
-        if (!config.apiKey) throw new Error('No API key configured');
+    try {
+        if (config.mode === 'dev') {
+            if (!config.apiKey) {
+                throw new Error('MISSING_API_KEY');
+            }
 
-        const response = await fetch(`${GEMINI_API_URL}?key=${config.apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature,
-                    maxOutputTokens: maxTokens,
-                    responseMimeType: 'application/json',
+            const response = await fetch(`${GEMINI_API_URL}?key=${config.apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        temperature,
+                        maxOutputTokens: maxTokens,
+                        responseMimeType: 'application/json',
+                    },
+                }),
+            });
+
+            if (response.status === 429 || response.status === 503) {
+                if (retries > 0) {
+                    console.warn(`[AI] Rate limited (${response.status}). Retrying in ${delay / 1000}s... (${retries} left)`);
+                    await new Promise(r => setTimeout(r, delay));
+                    return callAI(prompt, options, retries - 1, delay * 1.5);
+                }
+                throw new Error('QUOTA_EXCEEDED');
+            }
+
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(`Gemini API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        } else if (config.mode === 'production') {
+            // Production logic (backend proxy)
+            const response = await fetch(`${config.backendUrl}/api/ai`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${config.authToken}`,
                 },
-            }),
-        });
+                body: JSON.stringify({ prompt, temperature, maxTokens }),
+            });
 
-        if (!response.ok) {
-            const err = await response.text();
-            throw new Error(`Gemini API error: ${response.status} — ${err}`);
+            if (response.status === 429) {
+                if (retries > 0) {
+                    await new Promise(r => setTimeout(r, delay));
+                    return callAI(prompt, options, retries - 1, delay * 1.5);
+                }
+                throw new Error('QUOTA_EXCEEDED');
+            }
+
+            if (!response.ok) throw new Error(`Backend error: ${response.status}`);
+
+            const data = await response.json();
+            return data.text || '';
         }
-
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    } else if (config.mode === 'production') {
-        if (!config.backendUrl || !config.authToken) {
-            throw new Error('Backend not configured');
+    } catch (err) {
+        if (err.message === 'MISSING_API_KEY') {
+            throw new Error('Please enter a valid Gemini API key in Settings.');
         }
-
-        const response = await fetch(`${config.backendUrl}/api/ai`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.authToken}`,
-            },
-            body: JSON.stringify({ prompt, temperature, maxTokens }),
-        });
-
-        if (response.status === 429) {
-            throw new Error('QUOTA_EXCEEDED');
+        if (err.message === 'QUOTA_EXCEEDED') {
+            throw new Error('Rate limit exceeded. Please wait a moment and try again.');
         }
-
-        if (!response.ok) {
-            const err = await response.text();
-            throw new Error(`Backend error: ${response.status} — ${err}`);
-        }
-
-        const data = await response.json();
-        return data.text || '';
+        throw err;
     }
 
     throw new Error('Unknown AI mode');

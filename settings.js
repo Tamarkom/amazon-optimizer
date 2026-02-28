@@ -54,28 +54,41 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        showResult(els.testResult, 'Testing...', 'neutral');
+        showResult(els.testResult, 'Testing connection...', 'neutral');
 
-        try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: 'Say "connected" and nothing else.' }] }],
-                    generationConfig: { maxOutputTokens: 10 },
-                }),
-            });
+        const testConnection = async (retries = 1) => {
+            try {
+                // Use 1.5-flash for the most stable test
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: 'Say "ok".' }] }],
+                        generationConfig: { maxOutputTokens: 5 },
+                    }),
+                });
 
-            if (response.ok) {
-                showResult(els.testResult, '✓ Connected successfully! Gemini 2.0 Flash is ready.', 'ok');
-            } else {
-                const errText = await response.text();
-                showResult(els.testResult, `✗ Connection failed: ${response.status}. Check your API key.`, 'err');
+                if (response.ok) {
+                    showResult(els.testResult, '✓ Connected! Gemini 1.5 Flash is ready.', 'ok');
+                    return true;
+                } else if (response.status === 429 && retries > 0) {
+                    showResult(els.testResult, 'Rate limited. Retrying in 5s...', 'neutral');
+                    await new Promise(r => setTimeout(r, 5000));
+                    return testConnection(retries - 1);
+                } else {
+                    const errData = await response.json().catch(() => ({}));
+                    const msg = errData.error?.message || `Status: ${response.status}`;
+                    showResult(els.testResult, `✗ Error: ${msg}. If this is a new key, wait 5 min.`, 'err');
+                    return false;
+                }
+            } catch (err) {
+                showResult(els.testResult, `✗ Network error: ${err.message}`, 'err');
+                return false;
             }
-        } catch (err) {
-            showResult(els.testResult, `✗ Network error: ${err.message}`, 'err');
-        }
+        };
+
+        await testConnection();
     });
 
     // ─── Save ─────────────────────────────────────────────

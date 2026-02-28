@@ -3,6 +3,8 @@
 // Coordinates search, scraping, scoring, and AI analysis.
 // ============================================================
 
+console.log('[BG] Optimizer v1.0.1 started');
+
 // Import scoring and AI modules
 importScripts('scoring.js', 'ai.js');
 
