@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "Amazon Shopping Optimizer",
+  "version": "1.0.0",
+  "description": "Find the best deal on Amazon — AI-powered product comparison with smart scoring.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.amazon.com/*",
+    "*://*.amazon.co.uk/*",
+    "*://*.amazon.de/*",
+    "*://*.amazon.fr/*",
+    "*://*.amazon.co.jp/*",
+    "*://*.amazon.ca/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.amazon.com/dp/*",
+        "*://*.amazon.com/gp/product/*",
+        "*://*.amazon.com/*/dp/*",
+        "*://*.amazon.co.uk/dp/*",
+        "*://*.amazon.co.uk/gp/product/*",
+        "*://*.amazon.co.uk/*/dp/*",
+        "*://*.amazon.de/dp/*",
+        "*://*.amazon.de/gp/product/*",
+        "*://*.amazon.de/*/dp/*",
+        "*://*.amazon.ca/dp/*",
+        "*://*.amazon.ca/gp/product/*",
+        "*://*.amazon.ca/*/dp/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "settings.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

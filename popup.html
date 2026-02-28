@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=620">
+  <title>Amazon Shopping Optimizer</title>
+  <link rel="stylesheet" href="popup.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <span class="header-icon">⚡</span>
+      <h1>Shopping Optimizer</h1>
+    </div>
+    <div class="header-actions">
+      <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <!-- AI Status Badge -->
+  <div id="aiStatus" class="ai-status">
+    <span class="ai-dot"></span>
+    <span class="ai-label">AI Inactive</span>
+  </div>
+
+  <!-- Empty State -->
+  <div id="emptyState" class="empty-state">
+    <div class="empty-icon">🛒</div>
+    <h2>No results yet</h2>
+    <p>Navigate to an Amazon product page and click the <strong>Optimize</strong> button to find better deals.</p>
+  </div>
+
+  <!-- Loading State -->
+  <div id="loadingState" class="loading-state hidden">
+    <div class="loader">
+      <div class="loader-ring"></div>
+      <div class="loader-ring"></div>
+      <div class="loader-ring"></div>
+    </div>
+    <h2>Finding better deals...</h2>
+    <p id="loadingStep" class="loading-step">Searching for similar products</p>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsState" class="results-state hidden">
+    <!-- AI Decision Review -->
+    <div id="decisionReview" class="decision-review hidden">
+      <div class="review-header">
+        <span class="review-icon">🤖</span>
+        <span>AI Recommendation</span>
+      </div>
+      <p id="reviewText" class="review-text"></p>
+    </div>
+
+    <!-- Product Cards -->
+    <div id="productList" class="product-list"></div>
+
+    <!-- Score Legend -->
+    <div class="score-legend">
+      <span class="legend-item"><span class="dot dot-green"></span> 70+ Excellent</span>
+      <span class="legend-item"><span class="dot dot-yellow"></span> 50-69 Good</span>
+      <span class="legend-item"><span class="dot dot-red"></span> &lt;50 Below Avg</span>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div id="errorState" class="error-state hidden">
+    <div class="error-icon">⚠️</div>
+    <h2>Something went wrong</h2>
+    <p id="errorMessage"></p>
+    <button id="retryBtn" class="btn btn-primary">Try Again</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

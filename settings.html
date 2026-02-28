@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Amazon Optimizer — Settings</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0d1a;
+            --bg2: #141428;
+            --card: rgba(25, 25, 50, 0.7);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #f0f0f5;
+            --text2: #8888aa;
+            --accent: #ff9900;
+            --green: #00e676;
+            --red: #ff5252;
+            --radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 520px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent), #ffb84d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: var(--text2);
+            margin-bottom: 32px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .card h2 {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--accent);
+            margin-bottom: 16px;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        .field:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text2);
+            margin-bottom: 6px;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        select {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--accent);
+        }
+
+        .hint {
+            font-size: 11px;
+            color: var(--text2);
+            margin-top: 4px;
+        }
+
+        .hint a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text2);
+            transition: all 0.2s;
+        }
+
+        .mode-btn:hover {
+            border-color: rgba(255, 153, 0, 0.3);
+        }
+
+        .mode-btn.active {
+            border-color: var(--accent);
+            background: rgba(255, 153, 0, 0.08);
+            color: var(--accent);
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-top: 16px;
+        }
+
+        .status.ok {
+            background: rgba(0, 230, 118, 0.1);
+            color: var(--green);
+        }
+
+        .status.err {
+            background: rgba(255, 82, 82, 0.1);
+            color: var(--red);
+        }
+
+        .status.neutral {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text2);
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, var(--accent), #e88a00);
+            color: #1a1a2e;
+            box-shadow: 0 2px 8px rgba(255, 153, 0, 0.3);
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .btn-save:hover {
+            box-shadow: 0 4px 16px rgba(255, 153, 0, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-test {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-test:hover {
+            border-color: var(--accent);
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>⚡ Shopping Optimizer</h1>
+        <p class="subtitle">Configure AI features and account settings</p>
+
+        <!-- Mode Selector -->
+        <div class="mode-selector">
+            <button class="mode-btn active" data-mode="dev" id="modeDevBtn">
+                🔧 Dev Mode
+            </button>
+            <button class="mode-btn" data-mode="production" id="modeProdBtn">
+                🚀 Production
+            </button>
+        </div>
+
+        <!-- Dev Mode Settings -->
+        <div id="devSettings">
+            <div class="card">
+                <h2>Gemini API Key</h2>
+                <div class="field">
+                    <label for="apiKey">API Key</label>
+                    <input type="password" id="apiKey" placeholder="AIzaSy...">
+                    <p class="hint">
+                        Get your free key at
+                        <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>
+                        — Gemini 2.0 Flash is free (15 req/min)
+                    </p>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-test" id="testKeyBtn">Test Connection</button>
+                </div>
+                <div id="testResult"></div>
+            </div>
+        </div>
+
+        <!-- Production Settings -->
+        <div id="prodSettings" style="display: none;">
+            <div class="card">
+                <h2>Account</h2>
+                <div class="field">
+                    <label for="backendUrl">Backend URL</label>
+                    <input type="text" id="backendUrl" placeholder="https://your-backend.com">
+                </div>
+                <div class="field">
+                    <label for="authToken">Auth Token</label>
+                    <input type="password" id="authToken" placeholder="Your JWT token">
+                    <p class="hint">Log in on the website to get your auth token.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save -->
+        <button class="btn btn-save" id="saveBtn">Save Settings</button>
+
+        <div id="saveStatus"></div>
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+
+</html>

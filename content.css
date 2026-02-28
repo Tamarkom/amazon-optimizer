@@ -1,0 +1,120 @@
+/* ============================================================
+   content.css — Injected styles for the Optimize button
+   ============================================================ */
+
+/* ─── Optimize Button ───────────────────────────────────── */
+
+#amz-optimizer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ff9900 0%, #e88a00 100%);
+  color: #1a1a2e;
+  font-family: 'Amazon Ember', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(255, 153, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  justify-content: center;
+}
+
+#amz-optimizer-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffad33 0%, #ff9900 100%);
+  box-shadow: 0 4px 16px rgba(255, 153, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+#amz-optimizer-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(255, 153, 0, 0.3);
+}
+
+#amz-optimizer-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.amz-opt-icon {
+  font-size: 16px;
+}
+
+/* ─── Loading Animation ─────────────────────────────────── */
+
+#amz-optimizer-btn.amz-opt-loading .amz-opt-icon {
+  animation: amz-opt-spin 1s linear infinite;
+}
+
+@keyframes amz-opt-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+#amz-optimizer-btn.amz-opt-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  animation: amz-opt-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes amz-opt-shimmer {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(50%); }
+}
+
+/* ─── Notification ──────────────────────────────────────── */
+
+.amz-opt-notif {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-family: 'Amazon Ember', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 999999;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+  max-width: 360px;
+}
+
+.amz-opt-notif-info {
+  background: #1a1a2e;
+  color: #ffffff;
+  border-left: 4px solid #ff9900;
+}
+
+.amz-opt-notif-error {
+  background: #2e1a1a;
+  color: #ff6b6b;
+  border-left: 4px solid #ff4444;
+}
+
+.amz-opt-notif-success {
+  background: #1a2e1a;
+  color: #6bff6b;
+  border-left: 4px solid #44ff44;
+}
+
+.amz-opt-notif-hide {
+  opacity: 0;
+  transform: translateY(10px);
+}

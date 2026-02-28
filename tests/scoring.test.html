@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Scoring Engine Tests</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #111;
+            color: #eee;
+        }
+
+        .pass {
+            color: #0f0;
+        }
+
+        .fail {
+            color: #f33;
+        }
+
+        h2 {
+            color: #ff9900;
+            margin-top: 20px;
+        }
+
+        .test {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🧪 Scoring Engine Tests</h1>
+    <div id="results"></div>
+
+    <script src="../scoring.js"></script>
+    <script>
+        const results = document.getElementById('results');
+        let passed = 0, failed = 0;
+
+        function assert(name, condition) {
+            if (condition) {
+                passed++;
+                results.innerHTML += `<div class="test pass">✓ ${name}</div>`;
+            } else {
+                failed++;
+                results.innerHTML += `<div class="test fail">✗ ${name}</div>`;
+            }
+        }
+
+        function assertEq(name, actual, expected) {
+            assert(`${name} (got: ${actual}, expected: ${expected})`, actual === expected);
+        }
+
+        // ─── extractQuantity ─────────────────────────────────
+
+        results.innerHTML += '<h2>extractQuantity</h2>';
+
+        assertEq('Basic count', ScoringEngine.extractQuantity('AA Batteries 48 Count'), 48);
+        assertEq('Pack format', ScoringEngine.extractQuantity('Paper Towels 12 Pack'), 12);
+        assertEq('CT abbreviation', ScoringEngine.extractQuantity('Trash Bags 100ct'), 100);
+        assertEq('Pack of', ScoringEngine.extractQuantity('Pack of 24 Markers'), 24);
+        assertEq('Pieces', ScoringEngine.extractQuantity('Building Blocks 200 Pieces'), 200);
+        assertEq('No quantity', ScoringEngine.extractQuantity('Laptop Stand Adjustable'), 1);
+        assertEq('Empty string', ScoringEngine.extractQuantity(''), 1);
+
+        // ─── calculateUnitPrice ──────────────────────────────
+
+        results.innerHTML += '<h2>calculateUnitPrice</h2>';
+
+        assertEq('Basic', ScoringEngine.calculateUnitPrice(10, 5), 2);
+        assertEq('Quantity 1', ScoringEngine.calculateUnitPrice(25, 1), 25);
+        assertEq('Zero price', ScoringEngine.calculateUnitPrice(0, 10), Infinity);
+
+        // ─── buildSearchQueryFallback ────────────────────────
+
+        results.innerHTML += '<h2>buildSearchQueryFallback</h2>';
+
+        const q1 = ScoringEngine.buildSearchQueryFallback('Energizer AA Batteries Max Double A Battery Alkaline 48 Count');
+        assert('Removes numbers and units: ' + q1, !q1.includes('48') && !q1.includes('count'));
+        assert('Keeps product terms: ' + q1, q1.includes('batteries') || q1.includes('battery'));
+        assert('Removes stop words: ' + q1, !q1.includes('max'));
+
+        const q2 = ScoringEngine.buildSearchQueryFallback('');
+        assertEq('Empty returns empty', q2, '');
+
+        // ─── scoreProducts ──────────────────────────────────
+
+        results.innerHTML += '<h2>scoreProducts</h2>';
+
+        const testProducts = [
+            { title: 'Cheap Bad 10 Pack', price: 5, rating: 2.0, reviewCount: 10, shipping: { isPrime: false }, asin: 'A', url: '' },
+            { title: 'Mid Range 20 Pack', price: 15, rating: 4.0, reviewCount: 500, shipping: { isPrime: true, isFree: true }, asin: 'B', url: '' },
+            { title: 'Premium Good 50 Pack', price: 20, rating: 4.8, reviewCount: 5000, shipping: { isPrime: true, isFree: true }, asin: 'C', url: '' },
+        ];
+
+        const ranked = ScoringEngine.scoreProducts(testProducts);
+        assert('Returns correct count', ranked.length === 3);
+        assert('Products have scores', ranked.every(p => typeof p.score === 'number'));
+        assert('Sorted descending', ranked[0].score >= ranked[1].score);
+        assert('Best value tagged', ranked[0].isBestValue === true);
+        assert('Premium 50-pack should win (best unit price + rating)', ranked[0].asin === 'C');
+
+        // ─── With AI Sentiments ─────────────────────────────
+
+        results.innerHTML += '<h2>scoreProducts with AI</h2>';
+
+        const sentiments = { 'A': 90, 'B': 60, 'C': 80 };
+        const rankedAI = ScoringEngine.scoreProducts(testProducts, sentiments);
+        assert('AI scores computed', rankedAI.every(p => p.breakdown.reviewSentiment !== undefined));
+        assert('AI changes rankings or keeps same top', rankedAI[0].score >= rankedAI[1].score);
+
+        // ─── Summary ─────────────────────────────────────────
+
+        results.innerHTML += `<h2>Summary</h2>`;
+        results.innerHTML += `<div>Passed: ${passed} | Failed: ${failed}</div>`;
+        results.innerHTML += failed === 0
+            ? '<div class="pass" style="font-size:20px;margin-top:10px">✅ All tests passed!</div>'
+            : '<div class="fail" style="font-size:20px;margin-top:10px">❌ Some tests failed</div>';
+    </script>
+</body>
+
+</html>
