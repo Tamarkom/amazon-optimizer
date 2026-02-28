@@ -79,7 +79,7 @@ async function handleOptimize(product, tabId) {
 
         // Step 2: Search Amazon for similar products
         console.log('[BG] Searching Amazon...');
-        const searchResults = await searchAmazon(searchQuery, product.asin);
+        const searchResults = await searchAmazon(searchQuery, product.asin, tabId);
         console.log('[BG] Found', searchResults.length, 'potential candidates');
 
         if (searchResults.length === 0) {
@@ -89,7 +89,7 @@ async function handleOptimize(product, tabId) {
 
         // Step 3: Fetch detail pages for top results (parallel)
         console.log('[BG] Fetching details for top', Math.min(8, searchResults.length), 'products...');
-        const detailedProducts = await fetchProductDetails(searchResults.slice(0, 8));
+        const detailedProducts = await fetchProductDetails(searchResults.slice(0, 8), tabId);
         console.log('[BG] Successfully fetched', detailedProducts.length, 'detailed products');
 
         // Step 4: Include the original product
